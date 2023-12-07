@@ -144,6 +144,27 @@ GetStudyInfo()
 	return acc
 }
 
+Update()
+{
+	thisVersion := FileRead(A_ScriptDir "\Data\version.txt")
+	releaseURL := "https://www.dropbox.com/scl/fi/ve2ya140rz5kn029ihqgn/merge.zip?rlkey=sgc31a9f27nunpwn8eby3bv22&dl=0"
+	releaseVersionURL := "https://www.dropbox.com/scl/fi/ncudpqjiodzno0frr315w/version.txt?rlkey=epj58ulxafhx9d5tufb5747j1&dl=0"
+	whr := ComObject("WinHttp.WinHttpRequest.5.1")
+	whr.Open("GET", releaseVersionURL, true)
+	whr.Send()
+	whr.WaitForResponse()
+	releaseVersion := whr.ResponseText
+	if thisVersion != releaseVersion {
+		msgBox "Current version: " thisVersion "  Release version: " releaseVersion ". Press OK to update"
+		Download releaseURL, A_ScriptDir "\merge.zip"
+		run A_ScriptDir "\Data\unzip.exe -o ..\merge.zip"
+		MsgBox "Press OK to restart Merge."
+		run A_ScriptDir "\merge.exe"
+		exitApp
+	}
+Return
+}
+
 MakeGui()
 {
 	if (acc.Length > 1) {
@@ -195,24 +216,4 @@ MakeGui()
 	}
 Return
 }
-
-Update()
-{
-	thisVersion := FileRead(A_ScriptDir "\Data\version.txt")
-	releaseURL := "https://www.dropbox.com/scl/fi/ve2ya140rz5kn029ihqgn/merge.zip?rlkey=sgc31a9f27nunpwn8eby3bv22&dl=0"
-	releaseVersionURL := "https://www.dropbox.com/scl/fi/ncudpqjiodzno0frr315w/version.txt?rlkey=epj58ulxafhx9d5tufb5747j1&dl=0"
-	whr := ComObject("WinHttp.WinHttpRequest.5.1")
-	whr.Open("GET", releaseVersionURL, true)
-	whr.Send()
-	whr.WaitForResponse()
-	releaseVersion := whr.ResponseText
-	if thisVersion != releaseVersion {
-		msgBox "Current version: " thisVersion "  Release version: " releaseVersion ". Press OK to update"
-		Download releaseURL, A_ScriptDir "\merge.zip"
-		run A_ScriptDir "\Data\unzip.exe -o ..\merge.zip"
-		MsgBox "Press OK to restart Merge."
-		run A_ScriptDir "\merge.exe"
-		exitApp
-	}
-Return
-}
+	
