@@ -1,22 +1,123 @@
-TraySetIcon "merge.ico" ;set the tray icon
-Run 'powermic_control.exe' ;run the PowerMic hotkey adapter
+TraySetIcon A_ScriptDir "\Data\merge.ico" ;set the tray icon
+Run A_ScriptDir "\Data\powermic_control.exe" ;run the PowerMic hotkey adapter
 #InputLevel 1 ;set inputlevel to be able to receive scribe
 ProcessSetPriority "High"
 #SingleInstance Force
+
 ~::
 {
 	global ;set variables as global
-	MyGui := Gui()
 	destroyed := ""
 	SetTitleMatchMode 1
+
+;; close open patients in Epic
+	if  WinExist("ahk_exe alihmicafhost.exe") {
+	  CloseEpic()
+	}
+
+;; get accession number from PowerScribe360
+	If WinExist("ahk_exe Nuance.PowerScribe360.exe") {
+	   acc := GetStudyInfo()
+	}
+
+;; send accession number to Epic
+	if  WinExist("ahk_exe alihmicafhost.exe")
+		SendtoEpic()
+	
+;; generate GUI
+	MyGui := Gui()
+	MakeGui()
+	MyGui.Add('Text','w200', '')	
+	
+	;; Place GUI Near GE PACs
+	if WinExist("Study List")
+	{
+		WinGetPos &pacsx, &pacsy, &pacsw, &pacsh, "Study List"
+		guix := pacsx + 115
+		guiy := pacsy + 240
+		guioptions := "w225 x" guix " y" guiy
+	} else {
+		guioptions := "w225 x100 y500"
+	}
+	MyGui.Show(guioptions)
+	MyGui.Opt("+AlwaysOnTop")
+	MyGui.Title := "Merge" 
+	SetTimer CloseMerge, 30000 ;; autocloses the GUI window in 30 seconds
+	return
+}
+
+;; open accession number in GE PACs
+EnterInformation(GuiCtrlObj, Info)
+{
+  If WinExist("Study List") {
+	  WinActivate ("Study List")
+	  ControlFocus "Internet Explorer_Server1", "Study List"
+	  SetKeyDelay(5, 5)
+	  ControlSendText(GuiCtrlObj.text, "Internet Explorer_Server1", "Study List")
+	  ControlSend("{enter}", "Internet Explorer_Server1", "Study List")
+  }
+  A_Clipboard := GuiCtrlObj.text
+  destroyed := "no"
+  return
+}
+
+;; open accession number in GE PACs
+EnterInformationandKill(GuiCtrlObj, Info)
+{ 
+  If WinExist("Study List") {
+	  WinActivate ("Study List")
+	  ControlFocus "Internet Explorer_Server1", "Study List"
+	  SetKeyDelay(5, 5)
+	  ControlSendText(GuiCtrlObj.text, "Internet Explorer_Server1", "Study List")
+	  ControlSend("{enter}", "Internet Explorer_Server1", "Study List")
+  }
+  A_Clipboard := GuiCtrlObj.text
+  MyGui.Destroy()
+  destroyed := "yes"
+  return
+}
+
+SendtoEpic()
+{
+	SetTitleMatchMode 1
+	#WinActivateForce
+	WinActivate ("Hyperspace")
+	SetControlDelay -1
+	ControlClick "Chrome_RenderWidgetHostHWND1", "Hyperspace"
+	ControlSend("{control down}2{control up}", "Chrome_RenderWidgetHostHWND1", "Hyperspace")
+	Sleep(1750)
+	Send("{control down}v")
+	Send("{control up}")
+	Sleep (500)
+	Send ("{enter}")
+	Sleep (500)
+	Send("{enter}")
+	return
+}
+
+CloseMerge()
+{
+  MyGui.Destroy()
+  return
+}
+
+CloseEpic()
+{
+	SetTitleMatchMode 1
+	#WinActivateForce
+	WinActivate ("Hyperspace")
+	SetControlDelay -1
+	ControlClick "Chrome_RenderWidgetHostHWND1", "Hyperspace"
+	ControlSend("{control down}w{control up}", "Chrome_RenderWidgetHostHWND1", "Hyperspace")
+	Sleep (500)
+	return
+}
+
+GetStudyInfo()
+{
 	#WinActivateForce
 	WinActivate("PowerScribe")
 	WinWaitActive("ahk_exe Nuance.PowerScribe360.exe")
-
-	
-;; get accession number from PowerScribe360
-;; reading from the report status bar
-
 	controls := WinGetControls("ahk_exe Nuance.PowerScribe360.exe")
 	controlText := ""
 	for index, control in controls {
@@ -40,13 +141,11 @@ ProcessSetPriority "High"
 	}
 	
 	A_Clipboard := acc[1]
+	return acc
+}
 
-;; send accession number to Epic
-	if  WinExist("ahk_exe alihmicafhost.exe")
-		SendtoEpic()
-	
-;; generate GUI
-
+MakeGui()
+{
 	if (acc.Length > 1) {
 			MyGui.Add('Text','w200 x0 y0', '')
 			MyGui.SetFont("Bold")
@@ -94,70 +193,26 @@ ProcessSetPriority "High"
 			button := MyGui.Add("Button", "w200 h30 x12 y130", acc[1])
 			button.OnEvent("Click", EnterInformationandKill)
 	}
-	MyGui.Add('Text','w200', '')
-	WinGetPos &pacsx, &pacsy, &pacsw, &pacsh, "Study List"
-	guix := pacsx + 115
-	guiy := pacsy + 240
-	guioptions := "w225 x" guix " y" guiy
-	MyGui.Show(guioptions)
-	MyGui.Opt("+AlwaysOnTop")
-	MyGui.Title := "Merge" 
-	if (destroyed = "no") 
-		SetTimer CloseMerge, 25000
-	return
+Return
 }
 
-;; open accession number in GE PACs
-EnterInformation(GuiCtrlObj, Info)
+Update()
 {
-  WinActivate ("Study List")
-  ControlFocus "Internet Explorer_Server1", "Study List"
-  SetKeyDelay(5, 5)
-  ControlSendText(GuiCtrlObj.text, "Internet Explorer_Server1", "Study List")
-  ControlSend("{enter}", "Internet Explorer_Server1", "Study List")
-  A_Clipboard := GuiCtrlObj.text
-  destroyed := "no"
-  return
+	thisVersion := FileRead(A_ScriptDir "\Data\version.txt")
+	releaseURL := "https://www.dropbox.com/scl/fi/ve2ya140rz5kn029ihqgn/merge.zip?rlkey=sgc31a9f27nunpwn8eby3bv22&dl=0"
+	releaseVersionURL := "https://www.dropbox.com/scl/fi/ncudpqjiodzno0frr315w/version.txt?rlkey=epj58ulxafhx9d5tufb5747j1&dl=0"
+	whr := ComObject("WinHttp.WinHttpRequest.5.1")
+	whr.Open("GET", releaseVersionURL, true)
+	whr.Send()
+	whr.WaitForResponse()
+	releaseVersion := whr.ResponseText
+	if thisVersion != releaseVersion {
+		msgBox "Current version: " thisVersion "  Release version: " releaseVersion ". Press OK to update"
+		Download releaseURL, A_ScriptDir "\merge.zip"
+		run A_ScriptDir "\Data\unzip.exe -o ..\merge.zip"
+		MsgBox "Press OK to restart Merge."
+		run A_ScriptDir "\merge.exe"
+		exitApp
+	}
+Return
 }
-
-;; open accession number in GE PACs
-EnterInformationandKill(GuiCtrlObj, Info)
-{ global
-  WinActivate ("Study List")
-  ControlFocus "Internet Explorer_Server1", "Study List"
-  SetKeyDelay(5, 5)
-  ControlSendText(GuiCtrlObj.text, "Internet Explorer_Server1", "Study List")
-  ControlSend("{enter}", "Internet Explorer_Server1", "Study List")
-  A_Clipboard := GuiCtrlObj.text
-  MyGui.Destroy()
-  destroyed := "yes"
-  return
-}
-
-SendtoEpic()
-{
-	SetTitleMatchMode 1
-	#WinActivateForce
-	WinActivate ("Hyperspace")
-	SetControlDelay -1
-	ControlClick "Chrome_RenderWidgetHostHWND1", "Hyperspace"
-;	Sleep(100)
-;	ControlSend("{control down}w{control up}", "Chrome_RenderWidgetHostHWND1", "Hyperspace")
-;	Sleep(200)
-	ControlSend("{control down}2{control up}", "Chrome_RenderWidgetHostHWND1", "Hyperspace")
-	Sleep(1750)
-	Send("{control down}v")
-	Send("{control up}")
-	Sleep (250)
-	Send ("{enter}")
-	Sleep (500)
-	Send("{enter}")
-	return
-}
-
-CloseMerge()
-{
-  MyGui.Destroy()
-  return
-}
-
